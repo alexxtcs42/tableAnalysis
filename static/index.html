@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Анализ столов в кафе</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        .video-container {
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        #imageCanvas, #resultCanvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+        .result-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+        }
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 10px;
+            border: 2px solid;
+        }
+        .legend-person {
+            border-color: #ffc107;
+            border-style: dashed;
+        }
+        .legend-table-free {
+            border-color: #28a745;
+        }
+        .legend-table-occupied {
+            border-color: #dc3545;
+        }
+        .table-status {
+            display: inline-block;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .table-free {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .table-occupied {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .person-status {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #historyList {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .history-item {
+            border-bottom: 1px solid #eee;
+            padding: 8px 0;
+            transition: background-color 0.2s;
+        }
+        .history-item:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">🍽️ AI Cafe Analytics</a>
+            <div class="navbar-text text-light">
+                <small>Детекция столов и людей в реальном времени</small>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">📷 Анализ изображения/видео</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="fileInput" class="form-label">Загрузите изображение или видео</label>
+                            <input class="form-control" type="file" id="fileInput" accept="image/*,video/*">
+                        </div>
+
+                        <div class="video-container mb-3">
+                            <video id="videoElement" controls style="width: 100%; display: none;"></video>
+                            <canvas id="imageCanvas" style="width: 100%; display: none;"></canvas>
+                            <canvas id="resultCanvas" class="result-overlay"></canvas>
+                            <div id="noMedia" class="text-center p-5 border rounded">
+                                <i class="bi bi-image display-4 text-muted mb-3"></i>
+                                <p class="text-muted">Загрузите изображение или видео для анализа</p>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button id="processBtn" class="btn btn-primary" disabled>
+                                <span id="processText">🚀 Запустить анализ</span>
+                                <span id="processSpinner" class="spinner-border spinner-border-sm" style="display: none;"></span>
+                            </button>
+                            <button id="cameraBtn" class="btn btn-secondary">
+                                <i class="bi bi-camera"></i> Использовать камеру
+                            </button>
+                            <button id="reportBtn" class="btn btn-success" disabled>
+                                <i class="bi bi-download"></i> Скачать отчёт
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">📊 Результаты анализа</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resultsContainer">
+                            <p class="text-muted">Результаты появятся здесь после анализа</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">📈 Статистика в реальном времени</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="stat-card p-3 bg-light rounded">
+                                    <h2 id="totalTables" class="text-primary">0</h2>
+                                    <small>Всего столов</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="stat-card p-3 bg-light rounded">
+                                    <h2 id="occupiedTables" class="text-danger">0</h2>
+                                    <small>Занято столов</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row text-center mt-2">
+                            <div class="col-6">
+                                <div class="stat-card p-3 bg-light rounded">
+                                    <h2 id="freeTables" class="text-success">0</h2>
+                                    <small>Свободно столов</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="stat-card p-3 bg-light rounded">
+                                    <h2 id="peopleCount" class="text-warning">0</h2>
+                                    <small>Людей обнаружено</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <h6>Загруженность:</h6>
+                            <div class="progress" style="height: 25px;">
+                                <div id="occupancyBar" class="progress-bar bg-success" style="width: 0%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-muted">Свободно</small>
+                                <small id="occupancyPercent" class="text-muted fw-bold">0%</small>
+                                <small class="text-muted">Занято</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">🎨 Легенда</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-color legend-person"></div>
+                                <small>Человек (жёлтый пунктир)</small>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-table-free"></div>
+                                <small>Свободный стол (зелёный)</small>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-table-occupied"></div>
+                                <small>Занятый стол (красный)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">📋 История анализов</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="historyList">
+                            <p class="text-muted p-3">История загрузок</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для отчётов -->
+    <div class="modal fade" id="reportModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📄 Сформировать отчёт</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Тип отчёта:</label>
+                        <select id="reportType" class="form-select">
+                            <option value="pdf">PDF документ</option>
+                            <option value="excel">Excel таблица</option>
+                            <option value="json">JSON данные</option>
+                            <option value="summary_pdf">Сводный PDF отчёт</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Период:</label>
+                        <select id="reportPeriod" class="form-select">
+                            <option value="current">Текущий анализ</option>
+                            <option value="day">За день</option>
+                            <option value="week">За неделю</option>
+                            <option value="all">Вся история</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="generateReportBtn">Сформировать</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"></script>
+    <script src="app.js"></script>
+</body>
+</html>
