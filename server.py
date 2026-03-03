@@ -159,11 +159,11 @@ def analyze_image():
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # Детектирование столов - используем модель правильно
-        table_results = table_model.predict(image_rgb, conf=0.11, iou=0.10)[0]
+        table_results = table_model.predict(image_rgb, conf=0.10, iou=0.10)[0]
         table_detections = sv.Detections.from_ultralytics(table_results)
 
         # Детектирование людей
-        person_results = person_model.predict(image_rgb, conf=0.15, iou=0.15)[0]
+        person_results = person_model.predict(image_rgb, conf=0.10, iou=0.15)[0]
         person_detections = sv.Detections.from_ultralytics(person_results)
 
         # Фильтрация только столов (класс 60 в COCO - dining table)
@@ -203,7 +203,7 @@ def analyze_image():
 
                 # Динамический порог на основе размера стола
                 table_width = table_box[2] - table_box[0]
-                threshold = table_width * 0.75
+                threshold = table_width * 0.8
                 iou = calculate_iou(table_box, person_box)
                 iou_sum += iou
 
@@ -212,7 +212,7 @@ def analyze_image():
                     if iou > 0:
                         person_count += 1
 
-            if not (iou_sum > 0.3 or person_count > 2 or (iou_sum > 0.2 and person_count > 1)):
+            if not (iou_sum > 0.2 or person_count > 2 or (iou_sum > 0.1 and person_count > 1)):
                 is_occupied = False
 
             tables_data.append({
